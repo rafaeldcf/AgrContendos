@@ -125,48 +125,25 @@ function boton_shortcode( $atts, $content = null ) {
 			true 
 		) 
 	);	
-	/*
-	$boton = '
-	<table>
-		<tr>
-			<td style="width: 100%">Titulo</td>
-			<td style="width: 150px">Orden</td>
-		</tr>';
-	
-	$mypost = array( 
-		'post_type' => $tipo_post,
-		'orderby'    => 'meta_value',
-		'order'      => 'ASC',
-		'cat'   => $categoria_name,
-		'meta_query' => array(
-			array(
-				'key'     => $campo_orden
-			),
-		
+	$subpaginas = esc_html( 
+		get_post_meta( 
+			$id,
+			'subpaginas', 
+			true 
 		) 
 	);
-	$the_query = new WP_Query( $mypost ); 
-	if ( $the_query->have_posts() ) {
-		while ( $the_query->have_posts() ) {
-			$boton.='<tr>';
-			$the_query->the_post();
-			$boton.= '<td>' . get_the_title() .'</td><td>'.get_metadata('post', get_the_id(), 'orden',true).'</td>';
-			$boton.= '</tr>';
-			
-
-		}
-		$boton.="</table>";
-		wp_reset_postdata();	
-		
-		
-		
-	} else {
-		echo "No hay resultados con esos criterios.";
-	}
-	*/
-
+	$pagina_padre = esc_html( 
+		get_post_meta( 
+			$id,
+			'pagina_padre', 
+			true 
+		) 
+	);	
+	$template_file = plugin_dir_path( __FILE__ ) . "listado_agregador_contenidos.php";
+	include $template_file;
 	
 // 
+/*	
 	$mypost = array( 
 		'post_type' => $tipo_post,
 		'orderby'    => 'meta_value',
@@ -198,9 +175,9 @@ $the_query = new WP_Query( $mypost );
 </div>
 	<?php
 
+	*/
 	
-	
-	return $boton;
+	// return $boton;
 }
 
 
@@ -251,7 +228,7 @@ add_filter( 'manage_edit-'.$post_type_name.'_columns', 'my_columns' );
 function my_columns( $columns ) {
     $columns['shortcode'] = 'Shortcode';
 	$columns['tipo'] = 'Tipo';
-	$columns['categoria_name'] = 'Categoria';
+	// $columns['categoria_name'] = 'Categoria';
     $columns['campo_orden'] = 'Campo ordenacion';
 	// Quitamos la columna date
 	unset( $columns['date'] );
@@ -273,7 +250,13 @@ function populate_columns( $column ) {
 		echo "<input type='text' value='[".$shortcode." id=".get_the_ID()."]' size='28'>";
 	}elseif('tipo' == $column){
 		$tipo_post = get_post_meta( get_the_ID(), 'tipo_post', true );
-        echo $tipo_post;
+		$icon="";
+		if($tipo_post=="page"){
+			$icon='<span class="dashicons dashicons-admin-post"></span>';
+		}else if($tipo_post=="post"){
+			$icon='<span class="dashicons dashicons-admin-page"></span>';
+		}
+        echo $icon." ".$tipo_post;
 	}
 }
 // --------------------------------------------------------------------
@@ -375,16 +358,60 @@ function display_agregador_contenidos_meta_box( $movie_review ) {
 			true 
 		) 
 	);	
+	$subpaginas = esc_html( 
+		get_post_meta( 
+			$movie_review->ID,
+			'subpaginas', 
+			true 
+		) 
+	);	
+	$pagina_padre = esc_html( 
+		get_post_meta( 
+			$movie_review->ID,
+			'pagina_padre', 
+			true 
+		) 
+	);
+	
 ?>
 
-
-
+<script>
+jQuery(document).ready( function($) {
+	$("#tipo_post").change(function(){
+		var seleccionado=$("#tipo_post").val();
+		if(seleccionado=="post"){
+			gestionar_campos_paginas('hide');
+		}
+		if(seleccionado=="page"){
+			gestionar_campos_paginas('show');
+		}
+	});
+	
+	function gestionar_campos_paginas(accion){
+		if(accion=="hide"){
+			$("#campos_paginas_incl_sub").hide();
+			$("#campos_paginas_subs").hide();
+		}
+		if(accion=="show"){
+			$("#campos_paginas_incl_sub").show();
+			$("#campos_paginas_subs").show();
+		}		
+	}
+	
+	var actual = '<?php echo $tipo_post; ?>';
+	if(actual=="post"){
+		gestionar_campos_paginas('hide');
+	}else if(actual =="page"){
+		gestionar_campos_paginas('show');
+	}
+});
+</script>
 
 
 
 	<table>
 		<tr>
-			<td style="width: 100%">Tipo de Post</td>
+			<td style="width: ">Tipo de Post</td>
 			<td>
 				
 				<select name="tipo_post" id="tipo_post">
@@ -392,7 +419,34 @@ function display_agregador_contenidos_meta_box( $movie_review ) {
 					<option value="page" <?php if($tipo_post=="page") echo "selected"; ?>>Page</option>
 				</select>
 			</td>
-		</tr>		
+		</tr>
+		<tr id="campos_paginas_incl_sub">
+			<td style="width: 100%">&nbsp;&nbsp;- ¿Incluir sub-paginas en el listado?</td>
+			<td>	
+				<input type="checkbox" name="subpaginas" id="subpaginas" value="1" <?php checked( $subpaginas, 1, 'true' ); ?> />				</td>
+				</tr>
+		<tr id="campos_paginas_subs">
+			<td style="width: 100%">Mostrar sub-paginas de:</td>
+			<td>
+			<select name="pagina_padre" id="pagina_padre">
+				<option value="">-- TOP --</option>
+				<?php 
+     $pages = get_pages(); 
+     foreach ( $pages as $pagina ) {
+		 				$sel="";
+		 $pagina_id=$pagina->ID;
+		 $pagina_titulo=$pagina->post_title;
+		 				if($pagina_id==$pagina_padre){
+							$sel="selected";
+						}
+       $option = '<option value="' . $pagina_id . '" '.$sel.'>'.$pagina_titulo.'</option>';
+       echo $option;
+     }
+    ?>
+				</select>
+			</td>
+		</tr>	
+		
 		<tr>
 			<td style="width: 100%">Categoria</td>
 			<td>
@@ -442,7 +496,7 @@ function get_meta_values(){
 		</tr>				
     </table>
 <hr>
-<h4>Listado (Drag &amp; Drop)</h4>
+<h4>Listado <span class="dashicons dashicons-move"></span> Drag &amp; Drop</h4>
 <style>
 	#sortable { 
 		list-style-type: none; 
@@ -470,10 +524,18 @@ function get_meta_values(){
 // Imprimimos los datos dentro de etiquetas <ul></ul>
 ?>
 <?php 
-	
+	if($subpaginas==""){
+		$subpaginas_filtro='0';
+	}else{
+		$subpaginas_filtro='';
+	}	
+	if($pagina_padre!=""){
+		$subpaginas_filtro=$pagina_padre;
+	}
 	$mypost = array( 
 		'post_type' => $tipo_post,
 		'orderby'    => 'meta_value',
+		'post_parent' => $subpaginas_filtro,
 		'order'      => 'ASC',
 		'cat'   => $categoria_name,
 		'meta_query' => array(
@@ -483,6 +545,7 @@ function get_meta_values(){
 		
 		) 
 	);
+//	print_r($mypost);
 	$the_query = new WP_Query( $mypost ); 
 if ( $the_query->have_posts() ) {
 	echo '<ul id="sortable" style="width:100%">';
@@ -577,7 +640,16 @@ function add_agregador_contenidos_fields( $movie_review_id, $movie_review ) {
         }
         if ( isset( $_POST['tipo_post'] ) && $_POST['tipo_post'] != '' ) {
             update_post_meta( $movie_review_id, 'tipo_post', $_POST['tipo_post'] );
-        }		
+        }	
+        if ( isset( $_POST['subpaginas'] ) ) {
+            update_post_meta( $movie_review_id, 'subpaginas', $_POST['subpaginas'] );
+        }else{
+			update_post_meta( $movie_review_id, 'subpaginas', '' );
+		}
+		if ( isset( $_POST['pagina_padre'] )) {
+            update_post_meta( $movie_review_id, 'pagina_padre', $_POST['pagina_padre'] );
+        }	
+			
     }
 }
 
@@ -753,6 +825,7 @@ add_action( 'admin_footer', 'twd_cpt_list' );
 //                               INICIO
 // Añadimos un metabox para el estilo del listado de post
 // --------------------------------------------------------------------
+/*
 add_action( 'add_meta_boxes', 'add_metabox_estilos' );
 function add_metabox_estilos(){
     add_meta_box( 'metabox_estilos', 'Estilo del layout', 'metabox_estilos', 'agregador_contenidos', 'normal');
@@ -772,6 +845,13 @@ function metabox_estilos(){
 	</table>
 	<?
 }
+*/
+// --------------------------------------------------------------------
+//                               FIN
+// --------------------------------------------------------------------
+
+
+
 
 
 ?>
